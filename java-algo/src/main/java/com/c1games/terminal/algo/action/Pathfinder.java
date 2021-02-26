@@ -38,9 +38,9 @@ public class Pathfinder {
         }
     }
     
-    ActionSimulator.Location[][] map;
+    Locationable[][] map;
     
-    public Pathfinder(ActionSimulator.Location[][] map) {
+    public Pathfinder(Locationable[][] map) {
        this.map = map;
     }
 

@@ -22,165 +22,6 @@ import java.util.ListIterator;
 
 public class ActionSimulator {
 
-    public interface Location {
-        boolean hasStructure(); 
-        boolean hasMobileUnit();
-        List<? extends GameUnit> getUnits();
-        void add(MobileUnits units);
-        void remove(MobileUnits units);
-    }
-
-    private interface GameUnit {
-        double getTargetHealth();
-        void takeDamage(double damage);
-        void takeSplashDamage(double damage);
-        PlayerId getPlayer();
-    } 
-
-    private static class Structure implements Location, GameUnit {
-
-        public final UnitType type;
-        public double health;
-        public boolean upgraded = false;
-        public Coords coords;
-
-        public Structure(UnitType type, double health, Coords coords) {
-            this.type = type;
-            this.health = health;
-            this.coords = coords;
-        }
-
-        public double getTargetHealth() {
-            return health;
-        }
-
-        public void takeDamage(double damage) {
-            health -= damage;
-        }
-
-        public void takeSplashDamage(double damage) {
-            health -= damage;
-        }
-
-        public boolean hasStructure() {
-            return true;
-        }
-
-        public boolean hasMobileUnit() {
-            return false;
-        }
-
-        public PlayerId getPlayer() {
-            if (coords.y >= MapBounds.BOARD_SIZE / 2)
-                return PlayerId.Player2;
-            if (coords.y <= MapBounds.BOARD_SIZE / 2 - 1)
-                return PlayerId.Player1;
-            else
-                return PlayerId.Error;
-        }
-
-        public List<GameUnit> getUnits() {
-            List<GameUnit> ret = new ArrayList<GameUnit>();
-            ret.add(this);
-            return ret;
-        }
-
-        public void add(MobileUnits units) {
-        }
-
-        public void remove(MobileUnits units) {
-        }
-    }
-
-    private static class MobileUnitsList implements Location {
-
-        final List<MobileUnits> unitsList;
-
-        public MobileUnitsList() {
-            unitsList = new ArrayList<MobileUnits>();
-        }
-        
-        public boolean hasStructure() {
-            return false;
-        }
-
-        public boolean hasMobileUnit() {
-            return !unitsList.isEmpty();
-        }
-
-        public List<? extends GameUnit> getUnits() {
-            return unitsList;
-        }
-
-        public void add(MobileUnits units) {
-            unitsList.add(units);
-        }
-
-        public void remove(MobileUnits units) {
-            unitsList.remove(units);
-        }
-    }
-
-    private static class MobileUnits implements GameUnit {
-
-        public final UnitType type;
-        // back half contains dead units, front contains undamaged units
-        public final List<Double> healths;
-        public final Set<Coords> shieldsFrom;
-        public Coords coords;
-        public final int targetEdge;
-        public Queue<Coords> path;
-
-        public MobileUnits(UnitType type, int quantity, double startHealth, Coords coords, int targetEdge) {
-            this.type = type;
-            this.healths = new ArrayList<Double>();
-            for (int i = 0; i < quantity; i++) {
-                healths.add(startHealth);
-            }
-            this.coords = coords;
-            this.targetEdge = targetEdge;
-            this.shieldsFrom = new TreeSet<Coords>();
-        }
-
-        public double getTargetHealth() {
-            for (int i = healths.size() - 1; i >= 1; i--)
-                if (healths.get(i) > 0)
-                    return healths.get(i);
-            return healths.get(0);
-        }
-
-        public void takeDamage(double damage) {
-            for (int i = healths.size() - 1; i >= 0; i--)
-                if (healths.get(i) > 0) {
-                    healths.set(i, healths.get(i) - damage);
-                    return;
-                }
-        }
-
-        public void takeSplashDamage(double damage) {
-            for (int i = 0; i < healths.size(); i++) {
-                healths.set(i, healths.get(i) - damage);
-            }
-        }
-
-        public void removeDead() {
-            for (int i = healths.size() - 1; i >= 0; i--)
-                if (healths.get(i) <= 0)
-                    healths.remove(i);
-                else
-                    return;
-        }
-
-        public PlayerId getPlayer() {
-            if (targetEdge == MapBounds.EDGE_BOTTOM_LEFT || targetEdge == MapBounds.EDGE_BOTTOM_RIGHT)
-                return PlayerId.Player2;
-            else if (targetEdge == MapBounds.EDGE_TOP_LEFT || targetEdge == MapBounds.EDGE_TOP_RIGHT)
-                return PlayerId.Player1;
-            else
-                return PlayerId.Error;
-        }
-    }
-
     public static class ActionResults {
 
         public int P1scoredOn = 0;
@@ -192,12 +33,11 @@ public class ActionSimulator {
         }
     } 
 
-    public Location[][] map;
+    public Locationable[][] map;
     private List<Structure> structures;
     private List<MobileUnits> mobileUnits;
     private final Config config;
     private final List<Config.UnitInformation> upgradedUnitInfo;
-
 
     // Input should be GameState without any mobile units on board
     public ActionSimulator(GameState move) {
@@ -212,7 +52,7 @@ public class ActionSimulator {
 
         SortedMap<String, Structure> structById = new TreeMap<String, Structure>();
         // Fill map with existing structures
-        map = new Location[MapBounds.BOARD_SIZE][MapBounds.BOARD_SIZE];
+        map = new Locationable[MapBounds.BOARD_SIZE][MapBounds.BOARD_SIZE];
         for (int x = 0; x < MapBounds.BOARD_SIZE; x++) {
             for (int y = 0; y < MapBounds.BOARD_SIZE; y++) {
                 Coords coords = new Coords(x, y);
@@ -237,21 +77,21 @@ public class ActionSimulator {
         mobileUnits = new LinkedList<MobileUnits>();
     }
 
-    public Location getLocation(Coords coords) {
+    public Locationable getLocation(Coords coords) {
         if (!MapBounds.inArena(coords))
             return null;
         else
             return map[coords.x][coords.y];
     }
 
-    public void setLocation(Coords coords, Location put) {
+    public void setLocation(Coords coords, Locationable put) {
         if (MapBounds.inArena(coords))
             map[coords.x][coords.y] = put;
     }
 
     // Immediately place or remove units ignoring resourse cost
     public boolean spawnUnits(Coords coords, UnitType type, int quantity) {
-        Location location = getLocation(coords);
+        Locationable location = getLocation(coords);
         Config.UnitInformation unitInfo = config.unitInformation.get(type.ordinal());
 
         if (location == null)
@@ -429,7 +269,7 @@ public class ActionSimulator {
             for (int y = destructAt.y - window; y <= destructAt.y + window; y++) {
                 Coords here = new Coords(x, y);
                 double distance = destructAt.distance(here);
-                Location location = getLocation(here);
+                Locationable location = getLocation(here);
 
                 if (distance <= range && location != null) {
                     for (GameUnit u : location.getUnits()) {
@@ -462,7 +302,7 @@ public class ActionSimulator {
             for (int x = coords.x - window; x <= coords.x + window; x++) {
                 Coords here = new Coords(x, y);
                 double dist = coords.distance(here);
-                Location location = getLocation(here);
+                Locationable location = getLocation(here);
 
                 if (dist > range || location == null)
                     continue;
