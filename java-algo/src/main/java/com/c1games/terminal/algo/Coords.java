@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * Two-dimensional, integer coordinates.
  */
-public class Coords {
+public class Coords implements Comparable<Coords> {
     public int x;
     public int y;
 
@@ -30,5 +30,9 @@ public class Coords {
 
     public float distance(Coords other) {
         return (float)Math.sqrt(((x - other.x) * (x - other.x)) + ((y - other.y) * (y - other.y)));
+    }
+
+    public int compareTo(Coords other) {
+        return (x == other.x) ? (y - other.y) : (x - other.x);
     }
 }
