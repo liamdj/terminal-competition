@@ -29,8 +29,8 @@ public class GameState {
     //private Unit[][] remove;
     public List<Unit>[][] allUnits;
 
-    private List<SpawnCommand> buildStack = new ArrayList<>();
-    private List<SpawnCommand> deployStack = new ArrayList<>();
+    public List<SpawnCommand> buildStack = new ArrayList<>();
+    public List<SpawnCommand> deployStack = new ArrayList<>();
 
     public GameState(Config config, FrameData data) {
         this.config = config;

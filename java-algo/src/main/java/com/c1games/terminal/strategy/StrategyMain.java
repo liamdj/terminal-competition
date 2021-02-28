@@ -265,7 +265,7 @@ public class StrategyMain implements GameLoop {
         for (int x = 5; x <= 12; x++)
             destructorPathingLeft.add(new Coords(x, 13));
         List<Coords> destructorPathingRight = new ArrayList<Coords>();
-        for (int x = 22; x >= 15; x++)
+        for (int x = 22; x >= 15; x--)
             destructorPathingRight.add(new Coords(x, 13));
         pathingCoords.add(destructorPathingLeft);
         pathingCoords.add(destructorPathingRight);
