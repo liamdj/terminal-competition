@@ -144,7 +144,7 @@ public class ActionSimulator {
         else if (location.hasStructure()) {
             Structure struct = (Structure) location;
             if (type == UnitType.Remove) {
-                structures.remove(getLocation(coords));
+                structures.remove(location);
                 setLocation(coords, new MobileUnitsList()); 
             }
             else if (type == UnitType.Upgrade) {

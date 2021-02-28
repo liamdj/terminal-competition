@@ -32,6 +32,10 @@ public class Coords implements Comparable<Coords> {
         return (x == other.x) && (y == other.y);
     }
 
+    public static boolean equals(Coords c1, Coords c2) {
+        return (c1.x == c2.x) && (c1.y == c2.y);
+    }
+
     public float distance(Coords other) {
         return (float)Math.sqrt(((x - other.x) * (x - other.x)) + ((y - other.y) * (y - other.y)));
     }

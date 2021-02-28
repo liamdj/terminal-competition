@@ -96,20 +96,20 @@ public class StrategyMain implements GameLoop {
     // fraced of health at which walls are removed (to be replaced)
     private static final double HEALTH_TO_REPLACE_WALL_RATIO = 0.75;
 
-    private static final double ALLOC_DECAY = 0.05;
+    private static final double ALLOC_DECAY = 0.03;
     private static final double ALLOC_PER_DEAD_TURRET = 5;
-    private static final double ALLOC_PER_SCORE = 3;
-    private static final double ALLOC_SCORED_ON = 10;
+    private static final double ALLOC_PER_SCORE = 4;
+    private static final double ALLOC_SCORED_ON = 12;
     private static final double ALLOC_MIN_PER_BIT = 1.25;
     private static final double ALLOC_BASE_MIDDLE = 12;
     private static final double ALLOC_BASE_CORNER = 6;
 
     // fraction of cores of overdefended area removed per turn
-    private static final double OVERDEFENDED_REMOVAL_RATIO = 0.25;
+    private static final double OVERDEFENDED_REMOVAL_RATIO = 0.33;
     // fraction of cores used for offensive when attacking this turn
-    private static final double OFFENSIVE_CORES_RATIO = 0.67;
+    private static final double OFFENSIVE_CORES_RATIO = 0.75;
     // fraction of reduction of allocated cores when attacking next turn
-    private static final double REDUCE_ALLOC_ON_ATTACK_RATIO = 0.33;
+    private static final double REDUCE_ALLOC_ON_ATTACK_RATIO = 0.25;
 
     private static List<UnitPlacement> basicStructures;
     // indexed by region, then defense level
@@ -193,7 +193,7 @@ public class StrategyMain implements GameLoop {
     }
 
     private double totalCores(Config config, List<UnitPlacement> placements) {
-        double sum = 0;
+        double sum = 0.01;
         for (UnitPlacement place : placements) {
             Config.UnitInformation unitInfo = config.unitInformation.get(place.type.ordinal());
             if (unitInfo.cost1.isPresent())
@@ -306,16 +306,18 @@ public class StrategyMain implements GameLoop {
         for (double value : reductionBudget)
             coresSaved -= value;
 
-        Attack attack = testAttacks(move, attacksToConsider(move, 6), move.data.p1Stats.cores * OFFENSIVE_CORES_RATIO, coresSaved);
+        Attack attack = null;
+        if (move.data.turnInfo.turnNumber != 0)
+            attack = testAttacks(move, attacksToConsider(move, 6), move.data.p1Stats.cores * OFFENSIVE_CORES_RATIO, coresSaved);
         // GameIO.debug().println("turns to wait: " + attack.turnsToWait);
 
-        if (attack.turnsToWait == 0) {
+        if (attack != null && attack.turnsToWait == 0) {
             double[] constrainedBudget = defenseBudgeting(move, 1 - OFFENSIVE_CORES_RATIO, false);
             updateDefenses(move, constrainedBudget, attack.needClearRightCorner, attack.needClearLeftCorner);
             sendAttack(move, attack);
         }
         // prepare for attack next turn
-        else if (attack.turnsToWait == 1) {
+        else if (attack != null && attack.turnsToWait == 1) {
             updateDefenses(move, reductionBudget);
 
             if (attack.needClearRightCorner) {
@@ -361,6 +363,13 @@ public class StrategyMain implements GameLoop {
                 deadTurretLocations.add(death.coords);
             }
         }
+    }
+
+    private static boolean listContains(List<Coords> list, Coords coords) {
+        for (Coords item : list)
+            if (item.equals(coords))
+                return true;
+        return false;
     }
 
     // Player.Error does both
@@ -461,8 +470,8 @@ public class StrategyMain implements GameLoop {
                 move.data.p1Stats.cores = (float) coreBudget[r];
                 int level = coresToLevel(r, coreBudget[r] + coresInRegion[r]);
                 for (UnitPlacement placement : defensePlacements.get(r).get(level)) {
-                    if ((!keepRightCornerClear || !rightCornerPath.contains(placement.coords)) 
-                        && (!keepLeftCornerClear || !leftCornerPath.contains(placement.coords))) {
+                    if ((!keepRightCornerClear || !StrategyMain.listContains(rightCornerPath, placement.coords)) 
+                        && (!keepLeftCornerClear || !StrategyMain.listContains(leftCornerPath, placement.coords))) {
                         if (!attemptBuild(move, placement)) 
                             break; // done with building in this region
                     }
@@ -478,9 +487,9 @@ public class StrategyMain implements GameLoop {
                 for (int i = list.size() - 1; i >= 0 && coresToRemove > 0; i--) {
                     UnitPlacement placement = list.get(i);
                     if (placement.type != UnitType.Upgrade) {
-                        if (r == LOWER_LEFT && leftCornerChannel.contains(placement.coords))
+                        if (r == LOWER_LEFT && StrategyMain.listContains(leftCornerChannel, placement.coords))
                             continue;
-                        if (r == LOWER_RIGHT && rightCornerChannel.contains(placement.coords))
+                        if (r == LOWER_RIGHT && StrategyMain.listContains(rightCornerChannel, placement.coords))
                             continue;
                         Unit unit = move.getWallAt(placement.coords);
                         if (unit != null && !unit.upgraded) {
@@ -493,9 +502,9 @@ public class StrategyMain implements GameLoop {
                 for (int i = list.size() - 1; i >= 0 && coresToRemove > 0; i--) {
                     UnitPlacement placement = list.get(i);
                     if (placement.type != UnitType.Upgrade) {
-                        if (r == LOWER_LEFT && leftCornerChannel.contains(placement.coords))
+                        if (r == LOWER_LEFT && StrategyMain.listContains(leftCornerChannel, placement.coords))
                             continue;
-                        if (r == LOWER_RIGHT && rightCornerChannel.contains(placement.coords))
+                        if (r == LOWER_RIGHT && StrategyMain.listContains(rightCornerChannel, placement.coords))
                             continue;
                         Unit unit = move.getWallAt(placement.coords);
                         if (unit != null) {
@@ -731,7 +740,7 @@ public class StrategyMain implements GameLoop {
                 UnitPlacement leftSpawn = new UnitPlacement(new Coords(13, 0), UnitType.Scout, num);
                 UnitPlacement rightSpawn = new UnitPlacement(new Coords(14, 0), UnitType.Scout, entry.getKey() - num);
 
-                if (entry.getKey() != 0 || rightCornerClear) {
+                if (entry.getValue() != 0 || rightCornerClear) {
                     Attack rightClosed = new Attack(entry.getValue(), LOWER_RIGHT, new int[] { LOWER_LEFT, UPPER_RIGHT });
                     rightClosed.needClearRightCorner = true;
                     rightClosed.add(leftSpawn);
@@ -739,7 +748,7 @@ public class StrategyMain implements GameLoop {
                     attacks.add(rightClosed);
                 }
 
-                if (entry.getKey() != 0 || leftCornerClear) {
+                if (entry.getValue() != 0 || leftCornerClear) {
                     Attack leftClosed = new Attack(entry.getValue(), LOWER_LEFT, new int[] { LOWER_RIGHT, UPPER_LEFT });
                     leftClosed.needClearLeftCorner = true;
                     leftClosed.add(leftSpawn);
