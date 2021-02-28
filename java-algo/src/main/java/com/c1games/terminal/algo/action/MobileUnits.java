@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.Queue;
+import java.util.Deque;
 
 public class MobileUnits extends GameUnit {
 
@@ -19,7 +19,7 @@ public class MobileUnits extends GameUnit {
     public final Set<Coords> shieldsFrom;
     public Coords coords;
     public final int targetEdge;
-    public Queue<Coords> path;
+    public Deque<Coords> path;
 
     public MobileUnits(UnitType type, int quantity, double startHealth, Coords coords, int targetEdge) {
         this.type = type;
@@ -68,5 +68,9 @@ public class MobileUnits extends GameUnit {
             return PlayerId.Player1;
         else
             return PlayerId.Error;
+    }
+
+    public boolean isStructure() {
+        return false;
     }
 }

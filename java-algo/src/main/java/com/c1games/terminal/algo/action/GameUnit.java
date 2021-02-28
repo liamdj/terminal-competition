@@ -11,5 +11,6 @@ public abstract class GameUnit {
     abstract void takeSplashDamage(double damage);
 
     abstract PlayerId getPlayer();
-    
+
+    abstract boolean isStructure();
 }

@@ -18,7 +18,7 @@ sourceCompatibility = JavaVersion.VERSION_1_10
 targetCompatibility = JavaVersion.VERSION_1_10
 
 // Define the main class for the application
-mainClassName = 'com.c1games.terminal.starteralgo.StarterAlgo'
+mainClassName = 'com.c1games.terminal.strategy.StrategyMain'
 
 dependencies {
     // Use JUnit test framework

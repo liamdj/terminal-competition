@@ -50,6 +50,10 @@ public class Structure extends GameUnit implements Locationable {
             return PlayerId.Error;
     }
 
+    public boolean isStructure() {
+        return true;
+    }
+
     public List<GameUnit> getUnits() {
         List<GameUnit> ret = new ArrayList<GameUnit>();
         ret.add(this);
