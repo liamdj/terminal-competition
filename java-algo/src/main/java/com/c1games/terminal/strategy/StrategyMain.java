@@ -86,9 +86,9 @@ public class StrategyMain implements GameLoop {
     public static final int LOWER_LEFT = 1;
     public static final int LOWER_RIGHT = 2;
     public static final int UPPER_RIGHT = 3;
-    public static final int OTHER = 4;
-    public static final int TOP_LEFT = 5;
-    public static final int TOP_RIGHT = 6;
+    public static final int TOP_LEFT = 4;
+    public static final int TOP_RIGHT = 5;
+    public static final int OTHER = 6;
     private static final int[] REGIONS = new int[] { LOWER_RIGHT, LOWER_LEFT, UPPER_RIGHT, UPPER_LEFT };
 
     // fraction of health at which turrets are removed (to be replaced)
@@ -107,9 +107,9 @@ public class StrategyMain implements GameLoop {
     // fraction of cores of overdefended area removed per turn
     private static final double OVERDEFENDED_REMOVAL_RATIO = 0.25;
     // fraction of cores used for offensive when attacking this turn
-    private static final double OFFENSIVE_CORES_RATIO = 0.5;
+    private static final double OFFENSIVE_CORES_RATIO = 0.67;
     // fraction of reduction of allocated cores when attacking next turn
-    private static final double REDUCE_ALLOC_ON_ATTACK_RATIO = 0.25;
+    private static final double REDUCE_ALLOC_ON_ATTACK_RATIO = 0.33;
 
     private static List<UnitPlacement> basicStructures;
     // indexed by region, then defense level
@@ -130,6 +130,9 @@ public class StrategyMain implements GameLoop {
     private List<Structure> p2PrevPrevStructures = new ArrayList<Structure>();
 
     private int turnLastAttacked = -1;
+
+    private static final List<Coords> leftCornerChannel = List.of(new Coords(2, 13), new Coords(3, 12), new Coords(4, 11));
+    private static final List<Coords> rightCornerChannel = List.of(new Coords(25, 13), new Coords(24, 12), new Coords(23, 11));
 
     private boolean leftCornerClear; 
     private boolean rightCornerClear; 
@@ -304,7 +307,7 @@ public class StrategyMain implements GameLoop {
             coresSaved -= value;
 
         Attack attack = testAttacks(move, attacksToConsider(move, 6), move.data.p1Stats.cores * OFFENSIVE_CORES_RATIO, coresSaved);
-        GameIO.debug().println("turns to wait: " + attack.turnsToWait);
+        // GameIO.debug().println("turns to wait: " + attack.turnsToWait);
 
         if (attack.turnsToWait == 0) {
             double[] constrainedBudget = defenseBudgeting(move, 1 - OFFENSIVE_CORES_RATIO, false);
@@ -327,9 +330,9 @@ public class StrategyMain implements GameLoop {
         // assume not attacking this turn or next
         else {
             double[] standardBudget = defenseBudgeting(move, 1, false);
-            GameIO.debug().println("budget: ");
-            for (double d : standardBudget)
-                GameIO.debug().println(d + " ");
+            // GameIO.debug().println("budget: ");
+            // for (double d : standardBudget)
+            //     GameIO.debug().println(d + " ");
             updateDefenses(move, standardBudget);
         }
     }
@@ -475,6 +478,10 @@ public class StrategyMain implements GameLoop {
                 for (int i = list.size() - 1; i >= 0 && coresToRemove > 0; i--) {
                     UnitPlacement placement = list.get(i);
                     if (placement.type != UnitType.Upgrade) {
+                        if (r == LOWER_LEFT && leftCornerChannel.contains(placement.coords))
+                            continue;
+                        if (r == LOWER_RIGHT && rightCornerChannel.contains(placement.coords))
+                            continue;
                         Unit unit = move.getWallAt(placement.coords);
                         if (unit != null && !unit.upgraded) {
                             double cost = unit.unitInformation.cost1.getAsDouble();
@@ -486,6 +493,10 @@ public class StrategyMain implements GameLoop {
                 for (int i = list.size() - 1; i >= 0 && coresToRemove > 0; i--) {
                     UnitPlacement placement = list.get(i);
                     if (placement.type != UnitType.Upgrade) {
+                        if (r == LOWER_LEFT && leftCornerChannel.contains(placement.coords))
+                            continue;
+                        if (r == LOWER_RIGHT && rightCornerChannel.contains(placement.coords))
+                            continue;
                         Unit unit = move.getWallAt(placement.coords);
                         if (unit != null) {
                             double cost = unit.unitInformation.cost1.getAsDouble();
@@ -518,11 +529,17 @@ public class StrategyMain implements GameLoop {
 
     // checks if enemy units are directed away from corner
     private boolean cornerChannelBuilt(GameState move, boolean rightSide) {
-        if (rightSide)
-            return move.getWallAt(new Coords(25, 13)) != null && move.getWallAt(new Coords(24, 12)) != null && move.getWallAt(new Coords(23, 11)) != null;
-        
-        else
-            return move.getWallAt(new Coords(2, 13)) != null && move.getWallAt(new Coords(3, 12)) != null && move.getWallAt(new Coords(4, 11)) != null;
+        if (rightSide) {
+            for (Coords coords : rightCornerChannel)
+                if (move.getWallAt(coords) == null)
+                    return false;
+        }
+        else {
+            for (Coords coords : leftCornerChannel)
+                if (move.getWallAt(coords) == null)
+                    return false;
+        }
+        return true;
     }
 
     private double[] defenseBudgeting(GameState move, double fractionAvailable, boolean reduceAllocation) {
@@ -829,7 +846,7 @@ public class StrategyMain implements GameLoop {
         if (scores >= p2Health)
             return 30 - turns + 0.5 * (scores - p2Health);
         else 
-            return (coresDestroyed + 3 * scores) / turns;
+            return (coresDestroyed + 4 * scores) / turns;
     }
 
     public boolean canAttackCorner(GameState move, PlayerId player, boolean rightSide) {

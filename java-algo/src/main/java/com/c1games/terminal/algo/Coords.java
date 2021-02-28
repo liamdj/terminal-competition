@@ -28,6 +28,10 @@ public class Coords implements Comparable<Coords> {
         return "<" + x + ", " + y + ">";
     }
 
+    public boolean equals(Coords other) {
+        return (x == other.x) && (y == other.y);
+    }
+
     public float distance(Coords other) {
         return (float)Math.sqrt(((x - other.x) * (x - other.x)) + ((y - other.y) * (y - other.y)));
     }
