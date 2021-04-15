@@ -1,0 +1,345 @@
+package com.c1games.terminal.strategy;
+
+import com.c1games.terminal.algo.*;
+import com.c1games.terminal.algo.io.GameLoop;
+import com.c1games.terminal.algo.io.GameLoopDriver;
+import com.c1games.terminal.algo.map.GameState;
+import com.c1games.terminal.algo.map.MapBounds;
+import com.c1games.terminal.algo.map.Unit;
+import com.c1games.terminal.algo.map.CanSpawn;
+import com.c1games.terminal.algo.units.UnitType;
+import com.c1games.terminal.algo.action.ActionSimulator;
+
+import java.io.File;
+import java.util.*;
+
+/**
+ * 
+ */
+public class AlgoMain implements GameLoop {
+    public static void main(String[] args) {
+        new GameLoopDriver(new AlgoMain()).run();
+    }
+
+    private class UnitPlacement {
+        public Coords coords;
+        public UnitType type;
+        public int quantity;
+
+        public UnitPlacement(Coords coords, UnitType type) {
+            this.coords = coords;
+            this.type = type;
+            this.quantity = 1;
+        }
+
+        public UnitPlacement(Coords coords, UnitType type, int quantity) {
+            this.coords = coords;
+            this.type = type;
+            this.quantity = quantity;
+        }
+
+        @Override
+        public String toString() {
+            return type.toString() + ' ' + coords.toString();
+        }
+    }
+
+    private static final int LEFT = 0;
+    private static final int MIDDLE = 1;
+    private static final int RIGHT = 2;
+    private static final int[] REGIONS = { LEFT, MIDDLE, RIGHT };
+
+    private static final double PRIORITY_DECAY = 0.08;
+    private static final int HEALTH_TO_UPGRADE_TURRET = 50;
+    private static final int HEALTH_TO_UPGRADE_WALL = 30;
+
+    private static List<UnitPlacement> basicDefenses;
+    // indexed by region, then defense level
+    private static List<List<List<UnitPlacement>>> improvedDefenses;
+    private static List<UnitPlacement> supports;
+
+    private double[] buildPriorities = new double[REGIONS.length];
+    private int[] defenseLevels = new int[REGIONS.length];
+
+    private List<Coords> scoredOn = new ArrayList<Coords>();
+    private List<Coords> deadTurrets = new ArrayList<Coords>();
+
+    private int turnLastAttacked = -1;
+
+    private List<List<UnitPlacement>> readBaseFile(String fileName) throws Exception {
+        File f = new File(fileName);
+        Scanner scan = new Scanner(f);
+
+        List<List<UnitPlacement>> result = new ArrayList<List<UnitPlacement>>();
+        List<UnitPlacement> list = new ArrayList<UnitPlacement>();
+        result.add(list);
+        while (scan.hasNextLine()) {
+            String line = scan.nextLine();
+            if (line.isEmpty()) {
+                list = new ArrayList<UnitPlacement>();
+                result.add(list);
+            } else {
+                UnitType type;
+                switch (line.charAt(0)) {
+                    case 'T':
+                        type = UnitType.Turret;
+                        break;
+                    case 'W':
+                        type = UnitType.Wall;
+                        break;
+                    case 'U':
+                        type = UnitType.Upgrade;
+                        break;
+                    case 'S':
+                        type = UnitType.Support;
+                        break;
+                    default:
+                        throw new Exception("Error parsing base setup file");
+                }
+
+                for (String loc : line.substring(2).split(" ")) {
+                    String[] coords = loc.split(",");
+                    int x = Integer.parseInt(coords[0]);
+                    int y = Integer.parseInt(coords[1]);
+                    list.add(new UnitPlacement(new Coords(x, y), type));
+                }
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public void initialize(GameIO io, Config config) {
+        GameIO.debug().println("Beginning Algo");
+        GameIO.debug().println(System.getProperty("user.dir"));
+        try {
+            List<List<UnitPlacement>> arr = readBaseFile("base_setup/basic_defenses.txt");
+            basicDefenses = arr.get(0);
+            improvedDefenses = new ArrayList<List<List<UnitPlacement>>>();
+            improvedDefenses.add(readBaseFile("base_setup/left_defenses.txt"));
+            improvedDefenses.add(readBaseFile("base_setup/middle_defenses.txt"));
+            improvedDefenses.add(readBaseFile("base_setup/right_defenses.txt"));
+            arr = readBaseFile("base_setup/support.txt");
+            supports = arr.get(0);
+        } catch (Exception e) {
+            GameIO.debug().println(e.getMessage());
+        }
+    }
+
+    /**
+     * Make a move in the game.
+     */
+    @Override
+    public void onTurn(GameIO io, GameState move) {
+        GameIO.debug().println("Performing turn " + move.data.turnInfo.turnNumber);
+
+        updateBuildGoals();
+        boolean buildSupport = buildDefenses(move);
+
+        buildSupport = considerAttack(move) && buildSupport;
+        if (buildSupport) {
+            buildOffense(move);
+        }
+    }
+
+    /**
+     * Save process action frames. Careful there are many action frames per turn!
+     */
+    @Override
+    public void onActionFrame(GameIO io, GameState move) {
+
+        if (move.data.turnInfo.actionPhaseFrameNumber == 0) {
+            // save move.allUnits for future use
+        }
+
+        // Save locations that the enemy scored on against us to build up defenses
+        for (FrameData.Events.BreachEvent breach : move.data.events.breach) {
+            if (breach.unitOwner != PlayerId.Player1) {
+                scoredOn.add(breach.coords);
+            }
+        }
+        // Save locations where a turrent was destroyed to build up defenses
+        for (FrameData.Events.DeathEvent death : move.data.events.death) {
+            if (death.unitOwner == PlayerId.Player1 && death.destroyedUnitType == UnitType.Turret) {
+                deadTurrets.add(death.coords);
+            }
+        }
+    }
+
+    // Returns false if cannot afford unit and true otherwise
+    private boolean attemptBuild(UnitPlacement unit, GameState move) {
+        CanSpawn spawnable = move.canSpawn(unit.coords, unit.type, 1);
+        if (spawnable.affirmative()) {
+            if (unit.type == UnitType.Upgrade) {
+                Unit there = move.getWallAt(unit.coords);
+                if (there.type == UnitType.Turret && there.health > HEALTH_TO_UPGRADE_TURRET
+                        || there.type == UnitType.Wall && there.health > HEALTH_TO_UPGRADE_WALL) {
+                    move.attemptUpgrade(unit.coords);
+                } else {
+                    move.attemptRemoveStructure(unit.coords);
+                }
+            } else {
+                move.attemptSpawn(unit.coords, unit.type);
+            }
+        } else if (spawnable == CanSpawn.NotEnoughResources) {
+            return false;
+        } else if (spawnable == CanSpawn.UnitAlreadyPresent && move.getWallAt(unit.coords).type != unit.type
+                && unit.type != UnitType.Upgrade) {
+            move.attemptRemoveStructure(unit.coords);
+        }
+        return true;
+    }
+
+    // returns true if all units in queue exist/get built
+    private boolean buildDefenses(GameState move) {
+
+        // always ensures basic defenses are completed first
+        for (UnitPlacement unit : basicDefenses) {
+            if (!attemptBuild(unit, move)) {
+                return false;
+            }
+        }
+
+        // sort the regions by their build priorities
+        final Integer[] sortedRegions = { LEFT, MIDDLE, RIGHT };
+        Arrays.sort(sortedRegions, new Comparator<Integer>() {
+            @Override
+            public int compare(final Integer i1, final Integer i2) {
+                return Double.compare(buildPriorities[i1], buildPriorities[i2]);
+            }
+        });
+
+        // attempt to build defense levels in priority order
+        for (int i : sortedRegions) {
+            for (UnitPlacement unit : improvedDefenses.get(i).get(defenseLevels[i])) {
+                if (!attemptBuild(unit, move)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // changes defense level and side priority based on damage recieved
+    private void updateBuildGoals() {
+        boolean[] boostLevel = new boolean[REGIONS.length];
+        for (Coords loc : deadTurrets) {
+            int side;
+            if (loc.x <= 6)
+                side = LEFT;
+            else if (loc.x <= 11)
+                side = MIDDLE;
+            else
+                side = RIGHT;
+
+            boostLevel[side] = true;
+            buildPriorities[side]++;
+        }
+        for (Coords loc : scoredOn) {
+            int side;
+            if (loc.x <= 10)
+                side = LEFT;
+            else if (loc.x <= 13)
+                side = RIGHT;
+            else if (loc.x <= 20)
+                side = MIDDLE;
+            else
+                side = RIGHT;
+
+            boostLevel[side] = true;
+            buildPriorities[side]++;
+        }
+
+        // increase defense level (up to maximum) and decay priority
+        for (int i : REGIONS) {
+            buildPriorities[i] *= 1 - PRIORITY_DECAY;
+            if (boostLevel[i] && defenseLevels[i] < improvedDefenses.get(i).size() - 1) {
+                defenseLevels[i]++;
+                GameIO.debug().println("Defense level of region number " + i + " set to " + defenseLevels[i]);
+            }
+        }
+
+        scoredOn.clear();
+        deadTurrets.clear();
+    }
+
+    private void buildOffense(GameState move) {
+        for (UnitPlacement unit : supports) {
+            attemptBuild(unit, move);
+        }
+    }
+
+    private float nextBits(float currentBits, int turnNumber) {
+        return 0.75f * currentBits + 4f + (int) (turnNumber / 10);
+    }
+
+    private int compareAttacks(double cores1, double lives1, double cores2, double lives2) {
+        double cmp = (cores1 - cores2) + (lives1 - lives2) * 3;
+        if (cmp < 0)
+            return -1;
+        else if (cmp == 0)
+            return 0;
+        else 
+            return 1;
+    }
+
+    private boolean considerAttack(GameState move) {
+        // Checks all ping and all emp attacks with current setup for this turn and next 6
+        int turnNumber = move.data.turnInfo.turnNumber;
+        float[] bits = new float[7];
+        bits[0] = move.data.p1Stats.bits;
+        for (int t = 1; t < 7; t++) {
+            bits[t] = nextBits(bits[t-1], turnNumber + t);
+        }
+
+        int sinceLastAttack = turnNumber - turnLastAttacked;
+        UnitPlacement bestAttack = null;
+        double bestCoresPerTurn = 0;
+        double bestLivesPerTurn = 0;
+        for (UnitType type : new UnitType[] {UnitType.Scout, UnitType.Demolisher}) {
+            double cost = move.config.unitInformation.get(type.ordinal()).cost2.getAsDouble();
+            for (int t = 0; t < bits.length; t++) {
+                for (Coords coords : new Coords[] {new Coords(14, 0), new Coords(7, 6)}) {
+                    ActionSimulator sim = new ActionSimulator(move);
+                    UnitPlacement placement = new UnitPlacement(coords, type, (int) (bits[t] / cost));
+                    sim.spawnUnits(placement.coords, placement.type, placement.quantity);
+                    sim.run();
+
+                    double coresPerTurn = sim.P2coresLost / (sinceLastAttack + t);
+                    double livesPerTurn = sim.P2livesLost / (sinceLastAttack + t);
+                    if (compareAttacks(coresPerTurn, livesPerTurn, bestCoresPerTurn, bestLivesPerTurn) > 0) {
+                        if (t > 0)
+                            return false;
+                        bestAttack = placement;
+                        bestCoresPerTurn = coresPerTurn;
+                        bestLivesPerTurn = livesPerTurn;
+                    }
+                }
+            }
+        }
+        if (bestAttack == null) {
+            GameIO.debug().println("No attacks found");
+            return false;
+        }
+
+        ActionSimulator sim = new ActionSimulator(move);
+        sim.spawnUnits(bestAttack.coords, bestAttack.type, bestAttack.quantity);
+        sim.run();
+
+        while (move.attemptSpawn(bestAttack.coords, bestAttack.type)) {
+        }
+        turnLastAttacked = turnNumber;
+        
+        GameIO.debug().println(sim.pathOfUnits.size());
+        for (int i = 0; i < sim.pathOfUnits.size(); i++) {
+            GameIO.debug().print(sim.pathOfUnits.get(i) + " " + sim.unitsHealths.get(i) + "   ");
+        }
+        GameIO.debug().println();
+        GameIO.debug().println("Expected core damage: " + bestCoresPerTurn * sinceLastAttack);
+        GameIO.debug().println("Expected life damage: " + bestLivesPerTurn * sinceLastAttack);
+
+        return true;
+    }
+
+
+}

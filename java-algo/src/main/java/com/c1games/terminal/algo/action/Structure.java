@@ -13,7 +13,7 @@ public class Structure extends GameUnit implements Locationable {
     public final UnitType type;
     public double health;
     public boolean upgraded = false;
-    public Coords coords;
+    public final Coords coords;
 
     public Structure(UnitType type, double health, Coords coords) {
         this.type = type;
@@ -60,9 +60,4 @@ public class Structure extends GameUnit implements Locationable {
         return ret;
     }
 
-    public void add(MobileUnits units) {
-    }
-
-    public void remove(MobileUnits units) {
-    }
 }

@@ -8,6 +8,9 @@ import com.c1games.terminal.algo.map.MapBounds;
 import com.c1games.terminal.algo.map.Unit;
 import com.c1games.terminal.algo.units.UnitType;
 
+import com.c1games.terminal.algo.action.ActionSimulator;
+import com.c1games.terminal.algo.action.Pathfinder;
+
 import java.util.*;
 
 /**
@@ -57,6 +60,25 @@ public class StarterAlgo implements GameLoop {
     @Override
     public void onTurn(GameIO io, GameState move) {
         GameIO.debug().println("Performing turn " + move.data.turnInfo.turnNumber + " of your custom algo strategy");
+
+        final long startTime = System.currentTimeMillis();
+        for (int t = 0; t < 1000; t++) {
+        ActionSimulator sim = new ActionSimulator(move);
+            sim.spawnUnits(new Coords(14, 0), UnitType.Scout, 20);
+            sim.spawnUnits(new Coords(13, 0), UnitType.Scout, 20);
+            sim.run();
+        }
+        final long endTime = System.currentTimeMillis();
+        GameIO.debug().println("time: " + (endTime - startTime));
+        // GameIO.debug().println(move.getWallAt(new Coords(14, 0)));
+
+        // sim.spawnUnits(new Coords(13, 0), UnitType.Scout, 10);
+
+        // Pathfinder pather = new Pathfinder(sim.map);
+        // GameIO.debug().println(pather.getPath(new Coords(13, 0), MapBounds.EDGE_TOP_RIGHT));
+
+        // GameIO.debug().println("scores v 2: " + results.P2scoredOn);
+        // GameIO.debug().println("scores v 1: " + results.P1scoredOn);
 
         buildDefenses(move);
         buildReactiveDefenses(move);

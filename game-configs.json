@@ -21,12 +21,13 @@
       "shorthand":"FF",
       "startHealth":60.0,
       "unitCategory": 0,
-      "refundPercentage": 0.97,
-      "turnsRequiredToRemove": 1,
+      "refundPercentage": 0.90,
+      "turnsRequiredToRemove": 2,
       "upgrade": {
         "cost1": 2.0,
         "startHealth": 200.0,
-        "refundPercentage": 0.90
+        "refundPercentage": 0.80,
+        "turnsRequiredToRemove": 3
       }
     },
     {
@@ -42,16 +43,17 @@
       "startHealth":1.0,
       "unitCategory": 0,
       "shieldBonusPerY": 0.0,
-      "refundPercentage": 0.97,
+      "refundPercentage": 0.90,
       "shieldDecay": 0.0,
-      "turnsRequiredToRemove": 1,
+      "turnsRequiredToRemove": 2,
       "upgrade": {
         "cost1": 4.0,
         "shieldRange": 7,
-        "shieldPerUnit": 5,
-        "shieldBonusPerY": 0.3,
-        "refundPercentage": 0.90,
-        "startHealth":40.0
+        "shieldPerUnit": 1,
+        "shieldBonusPerY": 0.7,
+        "refundPercentage": 0.80,
+        "startHealth":40.0,
+        "turnsRequiredToRemove": 3
       }
     },
     {
@@ -66,14 +68,15 @@
       "shorthand":"DF",
       "startHealth":60.0,
       "unitCategory": 0,
-      "refundPercentage": 0.98,
-      "turnsRequiredToRemove": 1,
+      "refundPercentage": 0.90,
+      "turnsRequiredToRemove": 2,
       "upgrade": {
         "cost1": 4.0,
         "attackRange":3.5,
         "attackDamageWalker":20.0,
-        "refundPercentage": 0.90,
-        "startHealth":100.0
+        "refundPercentage": 0.80,
+        "startHealth":100.0,
+        "turnsRequiredToRemove": 3
       }
     },
     {
@@ -158,7 +161,7 @@
     "playWaitTimeBotMax":40000,
     "waitTimeManual":1820000,
     "waitForever":false,
-    "waitTimeBotSoft":5000,
+    "waitTimeBotSoft":15000,
     "playWaitTimeBotSoft":10000,
     "replaySave":1,
     "playReplaySave":0,
@@ -167,19 +170,19 @@
     "waitTimeEndGame":3000
   },
   "resources":{
-    "turnIntervalForBitCapSchedule":10,
-    "turnIntervalForBitSchedule":10,
+    "turnIntervalForBitCapSchedule":5,
+    "turnIntervalForBitSchedule":5,
     "bitRampBitCapGrowthRate":5.0,
-    "roundStartBitRamp":10,
+    "roundStartBitRamp":5,
     "bitGrowthRate":1.0,
     "startingHP":40.0,
     "maxBits":150.0,
-    "bitsPerRound":4.0,
-    "coresPerRound":5.0,
+    "bitsPerRound":1.0,
+    "coresPerRound":4.0,
     "coresForPlayerDamage":1.0,
-    "startingBits":4.0,
+    "startingBits":1.0,
     "bitDecayPerRound":0.25,
-    "startingCores":30.0
+    "startingCores":8.0
   },
   "misc":{
     "numBlockedLocations": 0,

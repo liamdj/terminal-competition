@@ -20,6 +20,7 @@ public class MobileUnits extends GameUnit {
     public Coords coords;
     public final int targetEdge;
     public Deque<Coords> path;
+    public Pathfinder.Direction lastDirection;
 
     public MobileUnits(UnitType type, int quantity, double startHealth, Coords coords, int targetEdge) {
         this.type = type;
@@ -30,6 +31,7 @@ public class MobileUnits extends GameUnit {
         this.coords = coords;
         this.targetEdge = targetEdge;
         this.shieldsFrom = new TreeSet<Coords>();
+        this.lastDirection = Pathfinder.Direction.Horizontal;
     }
 
     public double getTargetHealth() {

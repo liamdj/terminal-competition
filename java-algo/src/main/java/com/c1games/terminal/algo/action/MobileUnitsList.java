@@ -8,9 +8,9 @@ public class MobileUnitsList implements Locationable {
     final List<MobileUnits> unitsList;
 
     public MobileUnitsList() {
-        unitsList = new ArrayList<MobileUnits>();
+        unitsList = new ArrayList<>();
     }
-    
+
     public boolean hasStructure() {
         return false;
     }
@@ -19,15 +19,15 @@ public class MobileUnitsList implements Locationable {
         return !unitsList.isEmpty();
     }
 
-    public List<? extends GameUnit> getUnits() {
-        return unitsList;
+    public List<GameUnit> getUnits() {
+        return (List<GameUnit>) (List<? extends GameUnit>) unitsList;
     }
 
-    public void add(MobileUnits units) {
+    public void addUnits(MobileUnits units) {
         unitsList.add(units);
     }
 
-    public void remove(MobileUnits units) {
+    public void removeUnits(MobileUnits units) {
         unitsList.remove(units);
     }
 }

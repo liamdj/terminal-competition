@@ -5,14 +5,10 @@ import java.util.List;
 // Able to fill a space on the game map
 public interface Locationable {
 
-    boolean hasStructure(); 
+    boolean hasStructure();
 
     boolean hasMobileUnit();
 
-    List<? extends GameUnit> getUnits();
-
-    void add(MobileUnits units);
-
-    void remove(MobileUnits units);
+    List<GameUnit> getUnits();
 
 }

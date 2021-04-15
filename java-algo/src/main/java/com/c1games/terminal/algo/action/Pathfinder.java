@@ -5,15 +5,12 @@ import com.c1games.terminal.algo.map.MapBounds;
 
 import java.util.Deque;
 import java.util.PriorityQueue;
-import java.util.Deque;
 import java.util.LinkedList;
-import java.lang.Comparable;
 
 public class Pathfinder {
 
-    private static enum Direction {
-        Vertical,
-        Horizontal
+    public enum Direction {
+        VERTICAL, HORIZONTAL
     }
 
     private class Node implements Comparable<Node> {
@@ -21,10 +18,11 @@ public class Pathfinder {
         public final int dist;
         public final int direct;
         public final int index;
-        public final Direction approach; 
+        public final Direction approach;
         public final Node parent;
 
-        public Node(Coords coords, int minDist, int directionIdealness, int index, Direction approachDirection, Node parent) {
+        public Node(Coords coords, int minDist, int directionIdealness, int index, Direction approachDirection,
+                Node parent) {
             this.coords = coords;
             this.dist = minDist;
             this.direct = directionIdealness;
@@ -33,7 +31,8 @@ public class Pathfinder {
             this.parent = parent;
         }
 
-        // earlier in ordering means lower distance, then higher directionIdealness, then higher index
+        // earlier in ordering means lower distance, then higher directionIdealness,
+        // then higher index
         public int compareTo(Node other) {
             int cmpDist = Integer.compare(this.dist, other.dist);
             int cmpDirect = Integer.compare(other.direct, this.direct);
@@ -41,18 +40,18 @@ public class Pathfinder {
             return (cmpDist == 0) ? ((cmpDirect == 0) ? cmpIndex : cmpDirect) : cmpDist;
         }
     }
-    
-    Locationable[][] map;
-    
-    public Pathfinder(Locationable[][] map) {
-       this.map = map;
+
+    GameMap map;
+
+    public Pathfinder(GameMap map) {
+        this.map = map;
     }
 
-    public Deque<Coords> getPath(Coords start, int targetEdge) {
+    public Deque<Coords> getPath(Coords start, int targetEdge, Direction approachDirection) {
         int[][] distances = new int[MapBounds.BOARD_SIZE][MapBounds.BOARD_SIZE];
         for (int x = 0; x < MapBounds.BOARD_SIZE; x++) {
             for (int y = 0; y < MapBounds.BOARD_SIZE; y++) {
-                boolean open = map[x][y] != null && !map[x][y].hasStructure();
+                boolean open = map.getLocation(x, y) != null && !map.getLocation(x, y).hasStructure();
                 distances[x][y] = open ? Integer.MAX_VALUE : -1;
             }
         }
@@ -60,14 +59,15 @@ public class Pathfinder {
             return null;
 
         int index = 0;
-        PriorityQueue<Node> toCheck = new PriorityQueue<Node>();
-        Node startNode = new Node(start, manhattan(start, targetEdge), 0, index++, Direction.Horizontal, null);
+        PriorityQueue<Node> toCheck = new PriorityQueue<>();
+        Node startNode = new Node(start, manhattan(start, targetEdge), 0, index++, approachDirection, null);
         toCheck.add(startNode);
         distances[start.x][start.y] = 0;
 
         Node onEdge = null;
         Node deepest = startNode;
-        int yBack = (targetEdge == MapBounds.EDGE_TOP_LEFT || targetEdge == MapBounds.EDGE_TOP_RIGHT) ? 0 : MapBounds.BOARD_SIZE - 1;
+        int yBack = (targetEdge == MapBounds.EDGE_TOP_LEFT || targetEdge == MapBounds.EDGE_TOP_RIGHT) ? 0
+                : MapBounds.BOARD_SIZE - 1;
         int bestDepth = Math.abs(yBack - start.y);
 
         while (!toCheck.isEmpty() && onEdge == null) {
@@ -76,12 +76,12 @@ public class Pathfinder {
 
             for (Coords coords : popped.coords.neighbors()) {
                 int curDist = getCoords(coords, distances);
-                if (curDist != -1 && curDist > dist + 1) {
+                if (curDist > dist + 1) { // curDist != -1
                     distances[coords.x][coords.y] = dist + 1;
                     int manhat = manhattan(coords, targetEdge);
-                    Direction approach = (coords.x == popped.coords.x) ? Direction.Vertical : Direction.Horizontal;
+                    Direction approach = (coords.x == popped.coords.x) ? Direction.VERTICAL : Direction.HORIZONTAL;
                     int directionIdealness = 0;
-                    if (approach != popped.approach) 
+                    if (approach != popped.approach)
                         directionIdealness += 2;
                     if (manhat < manhattan(popped.coords, targetEdge))
                         directionIdealness += 1;
@@ -96,7 +96,7 @@ public class Pathfinder {
                     if (depth > bestDepth || (depth == bestDepth && manhat < manhattan(deepest.coords, targetEdge))) {
                         deepest = node;
                         bestDepth = depth;
-                    } 
+                    }
 
                     toCheck.add(node);
                 }
@@ -104,16 +104,14 @@ public class Pathfinder {
         }
 
         // Find path to self-destruct or reach edge
-        if (onEdge == null) {
-            // System.err.println("No path to edge. Aiming for " + deepest.coords);
+        if (onEdge == null)
             return backtracePath(deepest);
-        }
         else
             return backtracePath(onEdge);
     }
 
     private Deque<Coords> backtracePath(Node node) {
-        Deque<Coords> path = new LinkedList<Coords>();
+        Deque<Coords> path = new LinkedList<>();
         while (node != null) {
             path.addFirst(node.coords);
             node = node.parent;

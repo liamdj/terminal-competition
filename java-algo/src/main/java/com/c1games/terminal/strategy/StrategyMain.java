@@ -34,9 +34,9 @@ public class StrategyMain implements GameLoop {
     }
 
     private class UnitPlacement {
-        public Coords coords;
-        public UnitType type;
-        public int quantity;
+        public final Coords coords;
+        public final UnitType type;
+        public final int quantity;
 
         public UnitPlacement(Coords coords, UnitType type) {
             this.coords = coords;
@@ -76,10 +76,6 @@ public class StrategyMain implements GameLoop {
         public boolean add(UnitPlacement placement) {
             return spawns.add(placement);
         }
-
-        public boolean addAll(List<UnitPlacement> placements) {
-            return spawns.addAll(placements);
-        }
     }
 
     public static final int UPPER_LEFT = 0;
@@ -92,24 +88,24 @@ public class StrategyMain implements GameLoop {
     private static final int[] REGIONS = new int[] { LOWER_RIGHT, LOWER_LEFT, UPPER_RIGHT, UPPER_LEFT };
 
     // fraction of health at which turrets are removed (to be replaced)
-    private static final double HEALTH_TO_REPLACE_TURRET_RATIO = 0.75;
+    private static final double HEALTH_TO_REPLACE_TURRET_RATIO = 0.5;
     // fraced of health at which walls are removed (to be replaced)
     private static final double HEALTH_TO_REPLACE_WALL_RATIO = 0.75;
 
-    private static final double ALLOC_DECAY = 0.03;
-    private static final double ALLOC_PER_DEAD_TURRET = 5;
-    private static final double ALLOC_PER_SCORE = 4;
-    private static final double ALLOC_SCORED_ON = 12;
-    private static final double ALLOC_MIN_PER_BIT = 1.25;
-    private static final double ALLOC_BASE_MIDDLE = 12;
+    private static final double ALLOC_DECAY = 0.05;
+    private static final double ALLOC_PER_DEAD_TURRET = 6;
+    private static final double ALLOC_PER_SCORE = 3;
+    private static final double ALLOC_SCORED_ON = 10;
+    private static final double ALLOC_MIN_PER_BIT = 1;
+    private static final double ALLOC_BASE_MIDDLE = 15;
     private static final double ALLOC_BASE_CORNER = 6;
 
     // fraction of cores of overdefended area removed per turn
-    private static final double OVERDEFENDED_REMOVAL_RATIO = 0.33;
+    private static final double OVERDEFENDED_REMOVAL_RATIO = 0.2;
     // fraction of cores used for offensive when attacking this turn
-    private static final double OFFENSIVE_CORES_RATIO = 0.75;
+    private static final double OFFENSIVE_CORES_RATIO = 0.5;
     // fraction of reduction of allocated cores when attacking next turn
-    private static final double REDUCE_ALLOC_ON_ATTACK_RATIO = 0.25;
+    private static final double REDUCE_ALLOC_ON_ATTACK_RATIO = 0.2;
 
     private static List<UnitPlacement> basicStructures;
     // indexed by region, then defense level
@@ -131,12 +127,13 @@ public class StrategyMain implements GameLoop {
 
     private int turnLastAttacked = -1;
 
-    private static final List<Coords> leftCornerChannel = List.of(new Coords(2, 13), new Coords(3, 12), new Coords(4, 11));
-    private static final List<Coords> rightCornerChannel = List.of(new Coords(25, 13), new Coords(24, 12), new Coords(23, 11));
+    private static final List<Coords> leftCornerChannel = List.of(new Coords(2, 13), new Coords(3, 12),
+            new Coords(4, 11));
+    private static final List<Coords> rightCornerChannel = List.of(new Coords(25, 13), new Coords(24, 12),
+            new Coords(23, 11));
 
-    private boolean leftCornerClear; 
-    private boolean rightCornerClear; 
-
+    private boolean leftCornerClear;
+    private boolean rightCornerClear;
 
     private List<List<UnitPlacement>> readBaseFile(String fileName) throws Exception {
         File f = new File(fileName);
@@ -153,9 +150,9 @@ public class StrategyMain implements GameLoop {
             } else {
                 UnitType type;
                 char c = line.charAt(0);
-                if (c == 'T') 
+                if (c == 'T')
                     type = UnitType.Turret;
-                else if (c == 'W') 
+                else if (c == 'W')
                     type = UnitType.Wall;
                 else if (c == 'U')
                     type = UnitType.Upgrade;
@@ -172,6 +169,7 @@ public class StrategyMain implements GameLoop {
                 }
             }
         }
+        scan.close();
         return result;
     }
 
@@ -193,7 +191,7 @@ public class StrategyMain implements GameLoop {
     }
 
     private double totalCores(Config config, List<UnitPlacement> placements) {
-        double sum = 0.01;
+        double sum = 0;
         for (UnitPlacement place : placements) {
             Config.UnitInformation unitInfo = config.unitInformation.get(place.type.ordinal());
             if (unitInfo.cost1.isPresent())
@@ -230,10 +228,10 @@ public class StrategyMain implements GameLoop {
         basicStructures.addAll(leftBasics);
 
         List<List<UnitPlacement>> upperLeft = new ArrayList<List<UnitPlacement>>();
-        for (List<UnitPlacement> placements : upperRight) 
+        for (List<UnitPlacement> placements : upperRight)
             upperLeft.add(mirroredPlacements(placements));
         List<List<UnitPlacement>> lowerLeft = new ArrayList<List<UnitPlacement>>();
-        for (List<UnitPlacement> placements : lowerRight) 
+        for (List<UnitPlacement> placements : lowerRight)
             lowerLeft.add(mirroredPlacements(placements));
         defensePlacements = new ArrayList<List<List<UnitPlacement>>>();
         defensePlacements.add(upperLeft);
@@ -265,10 +263,10 @@ public class StrategyMain implements GameLoop {
         pathingCoords.add(extractCoords(rightPathings.get(1)));
         pathingCoords.add(extractCoords(rightPathings.get(0)));
         List<Coords> destructorPathingLeft = new ArrayList<Coords>();
-        for (int x = 5; x <= 12; x++)
+        for (int x = 5; x <= 8; x++)
             destructorPathingLeft.add(new Coords(x, 13));
         List<Coords> destructorPathingRight = new ArrayList<Coords>();
-        for (int x = 22; x >= 15; x--)
+        for (int x = 22; x >= 19; x--)
             destructorPathingRight.add(new Coords(x, 13));
         pathingCoords.add(destructorPathingLeft);
         pathingCoords.add(destructorPathingRight);
@@ -308,8 +306,8 @@ public class StrategyMain implements GameLoop {
 
         Attack attack = null;
         if (move.data.turnInfo.turnNumber != 0)
-            attack = testAttacks(move, attacksToConsider(move, 6), move.data.p1Stats.cores * OFFENSIVE_CORES_RATIO, coresSaved);
-        // GameIO.debug().println("turns to wait: " + attack.turnsToWait);
+            attack = testAttacks(move, attacksToConsider(move, 6), move.data.p1Stats.cores * OFFENSIVE_CORES_RATIO,
+                    coresSaved);
 
         if (attack != null && attack.turnsToWait == 0) {
             double[] constrainedBudget = defenseBudgeting(move, 1 - OFFENSIVE_CORES_RATIO, false);
@@ -332,9 +330,6 @@ public class StrategyMain implements GameLoop {
         // assume not attacking this turn or next
         else {
             double[] standardBudget = defenseBudgeting(move, 1, false);
-            // GameIO.debug().println("budget: ");
-            // for (double d : standardBudget)
-            //     GameIO.debug().println(d + " ");
             updateDefenses(move, standardBudget);
         }
     }
@@ -377,14 +372,13 @@ public class StrategyMain implements GameLoop {
         ActionSimulator sim = new ActionSimulator(move);
         List<Structure> list = sim.structures;
         if (player == PlayerId.Player1) {
-            for (Iterator<Structure> itr = list.iterator(); itr.hasNext(); ) {
+            for (Iterator<Structure> itr = list.iterator(); itr.hasNext();) {
                 Structure struct = itr.next();
                 if (struct.coords.y >= MapBounds.BOARD_SIZE / 2)
                     itr.remove();
             }
-        }
-        else if (player == PlayerId.Player2) {
-            for (Iterator<Structure> itr = list.iterator(); itr.hasNext(); ) {
+        } else if (player == PlayerId.Player2) {
+            for (Iterator<Structure> itr = list.iterator(); itr.hasNext();) {
                 Structure struct = itr.next();
                 if (struct.coords.y < MapBounds.BOARD_SIZE / 2)
                     itr.remove();
@@ -416,7 +410,7 @@ public class StrategyMain implements GameLoop {
             if (!attemptBuild(move, placement)) {
                 return false;
             }
-        } 
+        }
         return true;
     }
 
@@ -441,9 +435,9 @@ public class StrategyMain implements GameLoop {
         } else if (spawnable == CanSpawn.UnitAlreadyPresent) {
             Unit there = move.getWallAt(placement.coords);
             double startHealth = there.unitInformation.startHealth.getAsDouble();
-            if (there.type != placement.type || 
-                    (there.type == UnitType.Turret && there.health / startHealth <= HEALTH_TO_REPLACE_TURRET_RATIO) ||
-                    (there.type == UnitType.Wall && there.health / startHealth <= HEALTH_TO_REPLACE_WALL_RATIO) ) {
+            if ((there.type == UnitType.Wall && placement.type == UnitType.Turret)
+                    || (there.type == UnitType.Turret && there.health / startHealth <= HEALTH_TO_REPLACE_TURRET_RATIO)
+                    || (there.type == UnitType.Wall && there.health / startHealth <= HEALTH_TO_REPLACE_WALL_RATIO)) {
                 move.attemptRemoveStructure(placement.coords);
             }
         }
@@ -453,16 +447,17 @@ public class StrategyMain implements GameLoop {
     private int coresToLevel(int region, double cores) {
         List<Double> costs = defenseCosts.get(region);
         int level;
-        for (level = 0; level < costs.size() - 1 && cores > costs.get(level); level++)
+        for (level = 0; level < costs.size() && cores > costs.get(level); level++)
             ;
-        return level;
+        return Math.min(level, costs.size() - 1);
     }
 
     private void updateDefenses(GameState move, double[] coreBudget) {
         updateDefenses(move, coreBudget, false, false);
     }
 
-    private void updateDefenses(GameState move, double[] coreBudget, boolean keepRightCornerClear, boolean keepLeftCornerClear) {
+    private void updateDefenses(GameState move, double[] coreBudget, boolean keepRightCornerClear,
+            boolean keepLeftCornerClear) {
         float myCores = move.data.p1Stats.cores;
         for (int r : REGIONS) {
             if (coreBudget[r] > 0) {
@@ -470,9 +465,9 @@ public class StrategyMain implements GameLoop {
                 move.data.p1Stats.cores = (float) coreBudget[r];
                 int level = coresToLevel(r, coreBudget[r] + coresInRegion[r]);
                 for (UnitPlacement placement : defensePlacements.get(r).get(level)) {
-                    if ((!keepRightCornerClear || !StrategyMain.listContains(rightCornerPath, placement.coords)) 
-                        && (!keepLeftCornerClear || !StrategyMain.listContains(leftCornerPath, placement.coords))) {
-                        if (!attemptBuild(move, placement)) 
+                    if ((!keepRightCornerClear || !StrategyMain.listContains(rightCornerPath, placement.coords))
+                            && (!keepLeftCornerClear || !StrategyMain.listContains(leftCornerPath, placement.coords))) {
+                        if (!attemptBuild(move, placement))
                             break; // done with building in this region
                     }
                 }
@@ -483,22 +478,7 @@ public class StrategyMain implements GameLoop {
             else {
                 double coresToRemove = -1 * coreBudget[r] * OVERDEFENDED_REMOVAL_RATIO;
                 List<UnitPlacement> list = defensePlacements.get(r).get(defensePlacements.get(r).size() - 1);
-                // attempt to remove unupgraded structures first
-                for (int i = list.size() - 1; i >= 0 && coresToRemove > 0; i--) {
-                    UnitPlacement placement = list.get(i);
-                    if (placement.type != UnitType.Upgrade) {
-                        if (r == LOWER_LEFT && StrategyMain.listContains(leftCornerChannel, placement.coords))
-                            continue;
-                        if (r == LOWER_RIGHT && StrategyMain.listContains(rightCornerChannel, placement.coords))
-                            continue;
-                        Unit unit = move.getWallAt(placement.coords);
-                        if (unit != null && !unit.upgraded) {
-                            double cost = unit.unitInformation.cost1.getAsDouble();
-                            coresToRemove -= cost * move.attemptRemoveStructure(placement.coords);
-                        }
-                    }
-                }
-                // remove upgraded structures if there is nothing unupgraded to remove
+                // remove excess structures
                 for (int i = list.size() - 1; i >= 0 && coresToRemove > 0; i--) {
                     UnitPlacement placement = list.get(i);
                     if (placement.type != UnitType.Upgrade) {
@@ -542,8 +522,7 @@ public class StrategyMain implements GameLoop {
             for (Coords coords : rightCornerChannel)
                 if (move.getWallAt(coords) == null)
                     return false;
-        }
-        else {
+        } else {
             for (Coords coords : leftCornerChannel)
                 if (move.getWallAt(coords) == null)
                     return false;
@@ -552,12 +531,12 @@ public class StrategyMain implements GameLoop {
     }
 
     private double[] defenseBudgeting(GameState move, double fractionAvailable, boolean reduceAllocation) {
-       
+
         // find goal defense cores per region
         double[] budget = new double[REGIONS.length];
         for (int i = 0; i < budget.length; i++) {
             budget[i] = (i == UPPER_LEFT || i == UPPER_RIGHT) ? ALLOC_BASE_CORNER : ALLOC_BASE_MIDDLE;
-            budget[i] += Math.max(buildAllocations[i], move.data.p2Stats.bits * ALLOC_MIN_PER_BIT);
+            budget[i] += buildAllocations[i] + move.data.p2Stats.bits * ALLOC_MIN_PER_BIT;
             // severly clamp budget when attacking next turn
             if (reduceAllocation)
                 budget[i] *= 1 - REDUCE_ALLOC_ON_ATTACK_RATIO;
@@ -582,7 +561,7 @@ public class StrategyMain implements GameLoop {
             for (int i = 0; i < budget.length; i++)
                 if (budget[i] > 0)
                     budget[i] /= ratio;
-        
+
         return budget;
     }
 
@@ -612,36 +591,29 @@ public class StrategyMain implements GameLoop {
             if (coords.x <= 1) {
                 buildAllocations[UPPER_LEFT] += ALLOC_PER_SCORE;
                 scoredOn[UPPER_LEFT] = true;
-            }
-            else if (coords.x <= 3) {
-                buildAllocations[UPPER_LEFT] += 0.5  * ALLOC_PER_SCORE;
+            } else if (coords.x <= 3) {
+                buildAllocations[UPPER_LEFT] += 0.5 * ALLOC_PER_SCORE;
                 scoredOn[UPPER_LEFT] = true;
-                buildAllocations[LOWER_LEFT] += 0.5  * ALLOC_PER_SCORE;
+                buildAllocations[LOWER_LEFT] += 0.5 * ALLOC_PER_SCORE;
                 scoredOn[LOWER_LEFT] = true;
-            }
-            else if (coords.x <= 9) {
+            } else if (coords.x <= 9) {
                 buildAllocations[LOWER_LEFT] += ALLOC_PER_SCORE;
                 scoredOn[LOWER_LEFT] = true;
-            }
-            else if (coords.x <= 13) {
+            } else if (coords.x <= 13) {
                 buildAllocations[LOWER_RIGHT] += ALLOC_PER_SCORE;
                 scoredOn[LOWER_RIGHT] = true;
-            }
-            else if (coords.x <= 17) {
+            } else if (coords.x <= 17) {
                 buildAllocations[LOWER_LEFT] += ALLOC_PER_SCORE;
                 scoredOn[LOWER_LEFT] = true;
-            }
-            else if (coords.x <= 23) {
+            } else if (coords.x <= 23) {
                 buildAllocations[LOWER_RIGHT] += ALLOC_PER_SCORE;
                 scoredOn[LOWER_RIGHT] = true;
-            }
-            else if (coords.x <= 25) {
-                buildAllocations[UPPER_RIGHT] += 0.5  * ALLOC_PER_SCORE;
+            } else if (coords.x <= 25) {
+                buildAllocations[UPPER_RIGHT] += 0.5 * ALLOC_PER_SCORE;
                 scoredOn[UPPER_RIGHT] = true;
-                buildAllocations[LOWER_RIGHT] += 0.5  * ALLOC_PER_SCORE;
+                buildAllocations[LOWER_RIGHT] += 0.5 * ALLOC_PER_SCORE;
                 scoredOn[LOWER_RIGHT] = true;
-            }
-            else {
+            } else {
                 buildAllocations[UPPER_RIGHT] += ALLOC_PER_SCORE;
                 scoredOn[UPPER_RIGHT] = true;
             }
@@ -668,7 +640,8 @@ public class StrategyMain implements GameLoop {
         for (UnitPlacement placement : attack.spawns) {
             for (int n = 0; n < placement.quantity; n++) {
                 boolean success = move.attemptSpawn(placement.coords, placement.type);
-                if (success && move.isStructure(placement.type)) {
+                Unit struct = move.getWallAt(placement.coords);
+                if (success && struct != null && struct.type == UnitType.Wall) {
                     move.attemptRemoveStructure(placement.coords);
                 }
             }
@@ -678,7 +651,8 @@ public class StrategyMain implements GameLoop {
     }
 
     private List<Attack> attacksToConsider(GameState move, int lookAhead) {
-        // Find all scout and all demolisher attacks with current setup for this turn and next lookAhead
+        // Find all scout and all demolisher attacks with current setup for this turn
+        // and next lookAhead
         int turnNumber = move.data.turnInfo.turnNumber;
         double cores = (double) move.data.p1Stats.cores;
 
@@ -699,23 +673,23 @@ public class StrategyMain implements GameLoop {
         for (Map.Entry<Integer, Integer> entry : demolishersToTurns.entrySet()) {
             UnitPlacement leftSpawn = new UnitPlacement(new Coords(11, 2), UnitType.Demolisher, entry.getKey());
             UnitPlacement rightSpawn = new UnitPlacement(new Coords(16, 2), UnitType.Demolisher, entry.getKey());
-            
+
             // try each attack with or without additional pathings
-            for (boolean topPath : List.of(true, false)) { 
+            for (boolean topPath : List.of(true, false)) {
                 int[] pathings;
 
-                pathings = topPath ? new int[] { LOWER_RIGHT, TOP_LEFT} : new int[] { LOWER_RIGHT };
+                pathings = topPath ? new int[] { LOWER_RIGHT, TOP_LEFT } : new int[] { LOWER_RIGHT };
                 Attack rightUp = new Attack(entry.getValue(), LOWER_LEFT, pathings);
                 rightUp.add(leftSpawn);
                 attacks.add(rightUp);
 
-                pathings = topPath ? new int[] { UPPER_LEFT, TOP_RIGHT } : new int[] { UPPER_LEFT };             
+                pathings = topPath ? new int[] { UPPER_LEFT, TOP_RIGHT } : new int[] { UPPER_LEFT };
                 Attack rightDown = new Attack(entry.getValue(), LOWER_RIGHT, pathings);
                 rightDown.add(leftSpawn);
                 attacks.add(rightDown);
-                
+
                 pathings = topPath ? new int[] { LOWER_LEFT, TOP_RIGHT } : new int[] { LOWER_LEFT };
-                Attack leftUp = new Attack(entry.getValue(), LOWER_RIGHT, pathings); 
+                Attack leftUp = new Attack(entry.getValue(), LOWER_RIGHT, pathings);
                 leftUp.add(rightSpawn);
                 attacks.add(leftUp);
 
@@ -741,7 +715,8 @@ public class StrategyMain implements GameLoop {
                 UnitPlacement rightSpawn = new UnitPlacement(new Coords(14, 0), UnitType.Scout, entry.getKey() - num);
 
                 if (entry.getValue() != 0 || rightCornerClear) {
-                    Attack rightClosed = new Attack(entry.getValue(), LOWER_RIGHT, new int[] { LOWER_LEFT, UPPER_RIGHT });
+                    Attack rightClosed = new Attack(entry.getValue(), LOWER_RIGHT,
+                            new int[] { LOWER_LEFT, UPPER_RIGHT });
                     rightClosed.needClearRightCorner = true;
                     rightClosed.add(leftSpawn);
                     rightClosed.add(rightSpawn);
@@ -759,13 +734,6 @@ public class StrategyMain implements GameLoop {
         }
 
         return attacks;
-
-        // List<Integer>[] scoutBlockersToTry = new List<Integer>[] {
-        //     new ArrayList(new int[] { LOWER_LEFT }),
-        //     new ArrayList(new int[] { LOWER_LEFT, UPPER_RIGHT }),
-        //     new ArrayList(new int[] { LOWER_RIGHT }),
-        //     new ArrayList(new int[] { LOWER_RIGHT, UPPER_LEFT })
-        // }
     }
 
     private Attack testAttacks(GameState move, List<Attack> attacksToTry, double coresAvailable, double coresNextTurn) {
@@ -789,19 +757,20 @@ public class StrategyMain implements GameLoop {
                 continue;
 
             double minValue = Double.MAX_VALUE;
-            for (List<Structure> structs : List.of(mergedStructs1, mergedStructs2)) {
+            for (List<Structure> structs : List.of(currentStructs, mergedStructs1, mergedStructs2)) {
 
                 ActionSimulator sim = new ActionSimulator(move.config, structs);
                 double cores = coresAvailable;
                 if (attack.turnsToWait >= 1)
-                    cores += coresNextTurn + move.config.resources.coresPerRound * attack.turnsToWait;
+                    cores += coresNextTurn
+                            + OFFENSIVE_CORES_RATIO * move.config.resources.coresPerRound * attack.turnsToWait;
 
                 // first place mobile units
                 for (UnitPlacement units : attack.spawns) {
                     sim.spawnUnits(units.coords, units.type, units.quantity);
                 }
 
-                // remove corner structures if necessary 
+                // remove corner structures if necessary
                 if (attack.needClearRightCorner) {
                     for (Coords coords : rightCornerPath)
                         sim.spawnUnit(coords, UnitType.Remove);
@@ -834,8 +803,14 @@ public class StrategyMain implements GameLoop {
                 }
 
                 sim.run();
+
+                double value = attackValue(sim.p2CoresLost, sim.p2LivesLost, attack.turnsToWait + sinceLastAttack,
+                        move.data.p2Stats.integrity);
+                // reward corner attacks since they are harder to intercept
+                if (attack.needClearLeftCorner || attack.needClearRightCorner)
+                    value += 2;
                 // keep track of value versus worst set up
-                minValue = Math.min(minValue, attackValue(sim.p2CoresLost, sim.p2LivesLost, attack.turnsToWait + sinceLastAttack, move.data.p2Stats.integrity));
+                minValue = Math.min(minValue, value);
             }
             if (minValue > bestValue) {
                 bestAttack = attack;
@@ -845,17 +820,14 @@ public class StrategyMain implements GameLoop {
             }
         }
 
-        // GameIO.debug().println("Attack: unit = " + bestAttack.spawns.get(0).type + " turns to wait = " + bestAttack.turnsToWait);
-        // GameIO.debug().println("Expected value: " + bestValue);
-
         return bestAttack;
     }
 
     private double attackValue(double coresDestroyed, int scores, int turns, float p2Health) {
         if (scores >= p2Health)
-            return 30 - turns + 0.5 * (scores - p2Health);
-        else 
-            return (coresDestroyed + 4 * scores) / turns;
+            return 30 - turns + 0.33 * (scores - p2Health);
+        else
+            return (coresDestroyed + 3.5* scores) / turns;
     }
 
     public boolean canAttackCorner(GameState move, PlayerId player, boolean rightSide) {
@@ -865,8 +837,7 @@ public class StrategyMain implements GameLoop {
             yTarget = MapBounds.BOARD_SIZE / 2 - 1;
             yBoundry = MapBounds.BOARD_SIZE / 2;
             startEdge = rightSide ? MapBounds.EDGE_BOTTOM_LEFT : MapBounds.EDGE_BOTTOM_RIGHT;
-        }
-        else {
+        } else {
             yTarget = MapBounds.BOARD_SIZE / 2;
             yBoundry = MapBounds.BOARD_SIZE / 2 - 1;
             startEdge = rightSide ? MapBounds.EDGE_TOP_LEFT : MapBounds.EDGE_TOP_RIGHT;
@@ -884,6 +855,5 @@ public class StrategyMain implements GameLoop {
         Coords end = path.getLast();
         return MapBounds.IS_ON_EDGE[startEdge][end.x][end.y];
     }
-
 
 }
