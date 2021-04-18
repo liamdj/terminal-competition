@@ -8,7 +8,7 @@ import com.c1games.terminal.algo.units.UnitType;
 import java.util.List;
 import java.util.ArrayList;
 
-public class Structure extends GameUnit implements Locationable {
+public class Structure implements GameUnit, Locationable {
 
     public final UnitType type;
     public double health;
@@ -19,6 +19,10 @@ public class Structure extends GameUnit implements Locationable {
         this.type = type;
         this.health = health;
         this.coords = coords;
+    }
+
+    public Coords getCoords() {
+        return coords;
     }
 
     public double getTargetHealth() {

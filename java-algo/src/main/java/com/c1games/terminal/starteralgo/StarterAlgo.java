@@ -21,26 +21,13 @@ public class StarterAlgo implements GameLoop {
         new GameLoopDriver(new StarterAlgo()).run();
     }
 
-    private static final Coords[] wallProtectTurrets = {
-            new Coords(8, 12),
-            new Coords(19, 12)
-    };
+    private static final Coords[] wallProtectTurrets = { new Coords(8, 12), new Coords(19, 12) };
 
-    private static final Coords[] defensiveTurretLocations = {
-            new Coords(0, 13),
-            new Coords(27, 13),
-            new Coords(8, 11),
-            new Coords(19, 11),
-            new Coords(13, 11),
-            new Coords(14, 11)
-    };
+    private static final Coords[] defensiveTurretLocations = { new Coords(0, 13), new Coords(27, 13), new Coords(8, 11),
+            new Coords(19, 11), new Coords(13, 11), new Coords(14, 11) };
 
-    private static final Coords[] supportLocations = {
-            new Coords(13, 2),
-            new Coords(14, 2),
-            new Coords(13, 3),
-            new Coords(14, 3)
-    };
+    private static final Coords[] supportLocations = { new Coords(13, 2), new Coords(14, 2), new Coords(13, 3),
+            new Coords(14, 3) };
 
     private final Random rand = new Random();
 
@@ -63,10 +50,10 @@ public class StarterAlgo implements GameLoop {
 
         final long startTime = System.currentTimeMillis();
         for (int t = 0; t < 1000; t++) {
-        ActionSimulator sim = new ActionSimulator(move);
-            sim.spawnUnits(new Coords(14, 0), UnitType.Scout, 20);
-            sim.spawnUnits(new Coords(13, 0), UnitType.Scout, 20);
-            sim.run();
+            // ActionSimulator sim = new ActionSimulator(move);
+            // sim.spawnUnits(new Coords(14, 0), UnitType.Scout, 20);
+            // sim.spawnUnits(new Coords(13, 0), UnitType.Scout, 20);
+            // sim.run();
         }
         final long endTime = System.currentTimeMillis();
         GameIO.debug().println("time: " + (endTime - startTime));
@@ -75,7 +62,8 @@ public class StarterAlgo implements GameLoop {
         // sim.spawnUnits(new Coords(13, 0), UnitType.Scout, 10);
 
         // Pathfinder pather = new Pathfinder(sim.map);
-        // GameIO.debug().println(pather.getPath(new Coords(13, 0), MapBounds.EDGE_TOP_RIGHT));
+        // GameIO.debug().println(pather.getPath(new Coords(13, 0),
+        // MapBounds.EDGE_TOP_RIGHT));
 
         // GameIO.debug().println("scores v 2: " + results.P2scoredOn);
         // GameIO.debug().println("scores v 1: " + results.P1scoredOn);
@@ -86,22 +74,26 @@ public class StarterAlgo implements GameLoop {
         if (move.data.turnInfo.turnNumber < 5) {
             deployRandomInterceptors(move);
         } else {
-            // If they have a lot of units in the first two of their rows, we can use the long range Demolisher to deal damage to them
-            if (detectEnemyUnits(move,null, List.of(14,15), null) > 10) {
+            // If they have a lot of units in the first two of their rows, we can use the
+            // long range Demolisher to deal damage to them
+            if (detectEnemyUnits(move, null, List.of(14, 15), null) > 10) {
                 demolisherLineStrategy(move);
             }
-            // Otherwise lets go with a scout rush strategy where we send a ton of fast scoring units.
+            // Otherwise lets go with a scout rush strategy where we send a ton of fast
+            // scoring units.
             else {
-                // We only send scouts every other turn because its better to save up for a big attack.
+                // We only send scouts every other turn because its better to save up for a big
+                // attack.
                 if (move.data.turnInfo.turnNumber % 2 == 1) {
-                    // Lets dynamically choose which side to attack based on the expected path the units will take
+                    // Lets dynamically choose which side to attack based on the expected path the
+                    // units will take
                     Coords bestLoc = leastDamageSpawnLocation(move, List.of(new Coords(13, 0), new Coords(14, 0)));
                     for (int i = 0; i < 100; i++) {
-                        move.attemptSpawn(bestLoc,UnitType.Scout);
+                        move.attemptSpawn(bestLoc, UnitType.Scout);
                     }
                 }
                 // Lastly, lets build Supports
-                move.attemptSpawnMultiple(Arrays.asList(supportLocations),UnitType.Support);
+                move.attemptSpawnMultiple(Arrays.asList(supportLocations), UnitType.Support);
             }
         }
     }
@@ -111,7 +103,8 @@ public class StarterAlgo implements GameLoop {
      */
     @Override
     public void onActionFrame(GameIO io, GameState move) {
-        // Save locations that the enemy scored on against us to reactively build defenses
+        // Save locations that the enemy scored on against us to reactively build
+        // defenses
         for (FrameData.Events.BreachEvent breach : move.data.events.breach) {
             if (breach.unitOwner != PlayerId.Player1) {
                 scoredOnLocations.add(breach.coords);
@@ -134,8 +127,9 @@ public class StarterAlgo implements GameLoop {
      */
     private void buildReactiveDefenses(GameState move) {
         for (Coords loc : scoredOnLocations) {
-            // Build 1 space above the breach location so that it doesn't block our spawn locations
-            move.attemptSpawn(new Coords(loc.x, loc.y +1), UnitType.Turret);
+            // Build 1 space above the breach location so that it doesn't block our spawn
+            // locations
+            move.attemptSpawn(new Coords(loc.x, loc.y + 1), UnitType.Turret);
         }
     }
 
@@ -144,34 +138,37 @@ public class StarterAlgo implements GameLoop {
      */
     private void deployRandomInterceptors(GameState move) {
         /*
-        Lets send out Interceptors to help destroy enemy mobile units.
-        A complex algo would predict where the enemy is going to send units and
-        develop its strategy around that. But this algo is simple so lets just
-        send out interceptors in random locations and hope for the best.
-
-        Mobile units can only deploy on our edges. 
-        So lets get a list of those locations.
+         * Lets send out Interceptors to help destroy enemy mobile units. A complex algo
+         * would predict where the enemy is going to send units and develop its strategy
+         * around that. But this algo is simple so lets just send out interceptors in
+         * random locations and hope for the best.
+         * 
+         * Mobile units can only deploy on our edges. So lets get a list of those
+         * locations.
          */
         List<Coords> friendlyEdges = new ArrayList<>();
         friendlyEdges.addAll(Arrays.asList(MapBounds.EDGE_LISTS[MapBounds.EDGE_BOTTOM_LEFT]));
         friendlyEdges.addAll(Arrays.asList(MapBounds.EDGE_LISTS[MapBounds.EDGE_BOTTOM_RIGHT]));
 
         /*
-        While we have remaining bits to spend lets send out interceptors randomly.
-        */
+         * While we have remaining bits to spend lets send out interceptors randomly.
+         */
         while (move.numberAffordable(UnitType.Interceptor) >= 1) {
             Coords c = friendlyEdges.get(rand.nextInt(friendlyEdges.size()));
             move.attemptSpawn(c, UnitType.Interceptor);
             /*
-            We don't have to remove the location since multiple mobile units can occupy the same space. 
-            Note that if all edge locations are blocked this will infinite loop!
+             * We don't have to remove the location since multiple mobile units can occupy
+             * the same space. Note that if all edge locations are blocked this will
+             * infinite loop!
              */
         }
     }
 
     /**
-     * Goes through the list of locations, gets the path taken from them,
-     * and loosely calculates how much damage will be taken by traveling that path assuming speed of 1.
+     * Goes through the list of locations, gets the path taken from them, and
+     * loosely calculates how much damage will be taken by traveling that path
+     * assuming speed of 1.
+     * 
      * @param move
      * @param locations
      * @return
@@ -204,14 +201,17 @@ public class StarterAlgo implements GameLoop {
     }
 
     /**
-     * Counts the number of a units found with optional parameters to specify what locations and unit types to count.
-     * @param move GameState
+     * Counts the number of a units found with optional parameters to specify what
+     * locations and unit types to count.
+     * 
+     * @param move       GameState
      * @param xLocations Can be null, list of x locations to check for units
      * @param yLocations Can be null, list of y locations to check for units
-     * @param units Can be null, list of units to look for, null will check all
+     * @param units      Can be null, list of units to look for, null will check all
      * @return count of the number of units seen at the specified locations
      */
-    private int detectEnemyUnits(GameState move, List<Integer> xLocations, List<Integer> yLocations, List<UnitType> units) {
+    private int detectEnemyUnits(GameState move, List<Integer> xLocations, List<Integer> yLocations,
+            List<UnitType> units) {
         if (xLocations == null) {
             xLocations = new ArrayList<Integer>();
             for (int x = 0; x < MapBounds.BOARD_SIZE; x++) {
@@ -237,7 +237,7 @@ public class StarterAlgo implements GameLoop {
         int count = 0;
         for (int x : xLocations) {
             for (int y : yLocations) {
-                Coords loc = new Coords(x,y);
+                Coords loc = new Coords(x, y);
                 if (MapBounds.inArena(loc)) {
                     for (Unit u : move.allUnits[x][y]) {
                         if (units.contains(u.type)) {
@@ -252,14 +252,15 @@ public class StarterAlgo implements GameLoop {
 
     private void demolisherLineStrategy(GameState move) {
         /*
-        First lets find the cheapest structure. We could hardcode this to "Wall",
-        but lets demonstrate how to use java-algo features.
+         * First lets find the cheapest structure. We could hardcode this to "Wall", but
+         * lets demonstrate how to use java-algo features.
          */
         Config.UnitInformation cheapestUnit = null;
         for (Config.UnitInformation uinfo : move.config.unitInformation) {
             if (uinfo.unitCategory.isPresent() && move.isStructure(uinfo.unitCategory.getAsInt())) {
                 float[] costUnit = uinfo.cost();
-                if((cheapestUnit == null || costUnit[0] + costUnit[1] <= cheapestUnit.cost()[0] + cheapestUnit.cost()[1])) {
+                if ((cheapestUnit == null
+                        || costUnit[0] + costUnit[1] <= cheapestUnit.cost()[0] + cheapestUnit.cost()[1])) {
                     cheapestUnit = uinfo;
                 }
             }
@@ -268,11 +269,11 @@ public class StarterAlgo implements GameLoop {
             GameIO.debug().println("There are no structures?");
         }
 
-        for (int x = 27; x>=5; x--) {
+        for (int x = 27; x >= 5; x--) {
             move.attemptSpawn(new Coords(x, 11), move.unitTypeFromShorthand(cheapestUnit.shorthand.get()));
         }
 
-        for (int i = 0; i<22; i++) {
+        for (int i = 0; i < 22; i++) {
             move.attemptSpawn(new Coords(24, 10), UnitType.Demolisher);
         }
     }

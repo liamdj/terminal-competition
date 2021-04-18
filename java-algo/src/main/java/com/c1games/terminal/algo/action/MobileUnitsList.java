@@ -5,7 +5,7 @@ import java.util.ArrayList;
 
 public class MobileUnitsList implements Locationable {
 
-    final List<MobileUnits> unitsList;
+    public final List<MobileUnits> unitsList;
 
     public MobileUnitsList() {
         unitsList = new ArrayList<>();

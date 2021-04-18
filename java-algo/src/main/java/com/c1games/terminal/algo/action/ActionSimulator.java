@@ -4,13 +4,13 @@ import com.c1games.terminal.algo.Coords;
 import com.c1games.terminal.algo.PlayerId;
 import com.c1games.terminal.algo.Config;
 import com.c1games.terminal.algo.map.GameState;
-import com.c1games.terminal.algo.map.Unit;
 import com.c1games.terminal.algo.map.MapBounds;
+import com.c1games.terminal.algo.map.Unit;
 import com.c1games.terminal.algo.map.SpawnCommand;
 import com.c1games.terminal.algo.units.UnitType;
 
 import java.util.List;
-import java.util.ArrayList;
+import java.util.Deque;
 import java.util.LinkedList;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -24,39 +24,37 @@ public class ActionSimulator {
     public final List<MobileUnits> mobileUnits;
 
     private final Config config;
-    private final List<Config.UnitInformation> upgradedUnitInfo;
 
     public int p1LivesLost = 0;
     public int p2LivesLost = 0;
     public double p1CoresLost = 0;
     public double p2CoresLost = 0;
+    public Deque<Coords> unitPath = new LinkedList<>();
 
     // copies structures from another simulator instance
     // for given coords, keeps first in list and ignores others
-    public ActionSimulator(Config config, List<Structure> structuresToAdd) {
+    public ActionSimulator(Config config, List<GameUnit> unitsToAdd) {
         this.config = config;
-        upgradedUnitInfo = new ArrayList<Config.UnitInformation>();
-        for (Config.UnitInformation unitInfo : config.unitInformation) {
-            Config.UnitInformation copy = new Config.UnitInformation(unitInfo);
-            if (copy.upgrade.isPresent())
-                copy.upgrade();
-            upgradedUnitInfo.add(copy);
-        }
-
         map = new GameMap();
 
-        structures = new LinkedList<Structure>();
-        for (Structure struct : structuresToAdd) {
-            Config.UnitInformation unitInfo = config.unitInformation.get(struct.type.ordinal());
-            if (map.getLocation(struct.coords) == null
-                    && unitInfo.unitCategory.orElse(-1) == GameState.TowerUnitCategory) {
-                Structure copyStruct = new Structure(struct.type, struct.health, struct.coords);
-                copyStruct.upgraded = struct.upgraded;
-                structures.add(copyStruct);
-                map.setLocation(struct.coords, copyStruct);
+        structures = new LinkedList<>();
+        mobileUnits = new LinkedList<>();
+        for (GameUnit unit : unitsToAdd) {
+            if (unit.isStructure()) {
+                Structure oldStruct = (Structure) unit;
+                Structure struct = new Structure(oldStruct.type, oldStruct.health, oldStruct.coords);
+                struct.upgraded = oldStruct.upgraded;
+                map.setLocation(oldStruct.coords, struct);
+                structures.add(struct);
+            } else {
+                Locationable loc = map.getLocation(unit.getCoords());
+                MobileUnitsList list = (loc == null) ? new MobileUnitsList() : (MobileUnitsList) loc;
+                if (loc == null)
+                    map.setLocation(unit.getCoords(), list);
+                list.addUnits((MobileUnits) unit);
+                mobileUnits.add((MobileUnits) unit);
             }
         }
-        mobileUnits = new LinkedList<MobileUnits>();
 
         for (int x = 0; x < MapBounds.BOARD_SIZE; x++) {
             for (int y = 0; y < MapBounds.BOARD_SIZE; y++) {
@@ -69,38 +67,28 @@ public class ActionSimulator {
     }
 
     // Use spawn commands to create finalized map
-    public ActionSimulator(GameState move) {
+    public ActionSimulator(GameState move, boolean immediate) {
         config = move.config;
-        upgradedUnitInfo = new ArrayList<Config.UnitInformation>();
-        for (Config.UnitInformation unitInfo : config.unitInformation) {
-            Config.UnitInformation copy = new Config.UnitInformation(unitInfo);
-            if (copy.upgrade.isPresent())
-                copy.upgrade();
-            upgradedUnitInfo.add(copy);
-        }
+        map = new GameMap(move, !immediate);
 
-        SortedMap<String, Structure> structById = new TreeMap<String, Structure>();
-        // Fill map with existing structures
-        map = new GameMap();
+        SortedMap<String, Structure> structById = new TreeMap<>();
+        structures = new LinkedList<>();
+        mobileUnits = new LinkedList<>();
+        // Get existing units
         for (int x = 0; x < MapBounds.BOARD_SIZE; x++) {
             for (int y = 0; y < MapBounds.BOARD_SIZE; y++) {
-                Coords coords = new Coords(x, y);
-                if (MapBounds.inArena(coords)) {
-                    List<Unit> list = move.allUnits[x][y];
-                    if (!list.isEmpty()) {
-                        Unit unit = list.get(0);
-                        Structure struct = new Structure(unit.type, unit.health, coords);
-                        struct.upgraded = unit.upgraded;
-                        map.setLocation(coords, struct);
-                        structById.put(unit.id, struct);
-                    } else {
-                        map.setLocation(coords, new MobileUnitsList());
-                    }
+                Locationable loc = map.getLocation(x, y);
+                if (loc == null)
+                    continue;
+                if (loc.hasStructure()) {
+                    Unit unit = move.allUnits[x][y].get(0);
+                    structById.put(unit.id, (Structure) loc);
+                } else if (loc.hasMobileUnit()) {
+                    mobileUnits.addAll(((MobileUnitsList) loc).unitsList);
                 }
             }
         }
 
-        structures = new LinkedList<Structure>();
         for (Structure struct : structById.values()) {
             structures.add(struct);
         }
@@ -108,11 +96,6 @@ public class ActionSimulator {
         for (SpawnCommand command : move.buildStack) {
             spawnUnit(new Coords(command.x, command.y), command.type);
         }
-        mobileUnits = new LinkedList<MobileUnits>();
-    }
-
-    public boolean spawnUnit(Coords coords, UnitType type) {
-        return spawnUnits(coords, type, 1);
     }
 
     public Config.UnitInformation getInfo(UnitType type, Boolean upgraded) {
@@ -122,7 +105,11 @@ public class ActionSimulator {
             return config.unitInformation.get(type.ordinal());
     }
 
-    // Immediately place or remove units ignoring resourse cost
+    public boolean spawnUnit(Coords coords, UnitType type) {
+        return spawnUnits(coords, type, 1);
+    }
+
+    // Immediately place or remove units ignoring resource cost
     public boolean spawnUnits(Coords coords, UnitType type, int quantity) {
         if (quantity <= 0)
             return false;
@@ -183,6 +170,7 @@ public class ActionSimulator {
         for (int frame = 0; !mobileUnits.isEmpty(); frame++) {
 
             // Move mobile units
+            unitPath.add(mobileUnits.get(0).coords);
             for (Iterator<MobileUnits> itr = mobileUnits.iterator(); itr.hasNext();) {
                 MobileUnits units = itr.next();
                 double speed = getInfo(units.type, false).speed.getAsDouble();
@@ -257,9 +245,7 @@ public class ActionSimulator {
                         double damage = unitInfo.attackDamageWalker.getAsDouble();
                         if (target.isStructure()) {
                             Structure struct = (Structure) target;
-                            Config.UnitInformation targetInfo = struct.upgraded
-                                    ? upgradedUnitInfo.get(struct.type.ordinal())
-                                    : config.unitInformation.get(struct.type.ordinal());
+                            Config.UnitInformation targetInfo = getInfo(struct.type, struct.upgraded);
                             double coreValue = Math.min(damage, target.getTargetHealth())
                                     / targetInfo.startHealth.getAsDouble() * targetInfo.cost1.getAsDouble();
                             if (target.getPlayer() == PlayerId.Player1)
@@ -302,7 +288,7 @@ public class ActionSimulator {
     private void pathfind() {
         Pathfinder pather = new Pathfinder(map);
         for (MobileUnits units : mobileUnits) {
-            units.path = pather.getPath(units.coords, units.targetEdge, units.lastMovement);
+            units.path = pather.getPath(units.coords, units.targetEdge, units.lastDirection);
         }
     }
 
@@ -311,7 +297,7 @@ public class ActionSimulator {
 
         int yMovement = (units.getPlayer() == PlayerId.Player1) ? 1 : -1;
         Coords destructAt = new Coords(units.coords.x, units.coords.y + yMovement);
-        // config.meechanics not initializated ?
+        // config.mechanics not initializated ?
         // float range = config.mechanics.selfDestructRadius;
         double range = 1.5;
         double damage = unitInfo.startHealth.getAsDouble();
@@ -321,7 +307,7 @@ public class ActionSimulator {
             for (int y = destructAt.y - window; y <= destructAt.y + window; y++) {
                 Coords here = new Coords(x, y);
                 double distance = destructAt.distance(here);
-                Locationable location = getLocation(here);
+                Locationable location = map.getLocation(here);
 
                 if (distance <= range && location != null) {
                     for (GameUnit u : location.getUnits()) {
@@ -354,7 +340,7 @@ public class ActionSimulator {
             for (int x = coords.x - window; x <= coords.x + window; x++) {
                 Coords here = new Coords(x, y);
                 double dist = coords.distance(here);
-                Locationable location = getLocation(here);
+                Locationable location = map.getLocation(here);
 
                 if (dist > range || location == null)
                     continue;

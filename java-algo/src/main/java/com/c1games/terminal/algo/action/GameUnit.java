@@ -1,16 +1,19 @@
 package com.c1games.terminal.algo.action;
 
+import com.c1games.terminal.algo.Coords;
 import com.c1games.terminal.algo.PlayerId;
 
-public abstract class GameUnit {
+public interface GameUnit {
 
-    abstract double getTargetHealth();
+    double getTargetHealth();
 
-    abstract void takeDamage(double damage);
+    Coords getCoords();
 
-    abstract void takeSplashDamage(double damage);
+    void takeDamage(double damage);
 
-    abstract PlayerId getPlayer();
+    void takeSplashDamage(double damage);
 
-    abstract boolean isStructure();
+    PlayerId getPlayer();
+
+    boolean isStructure();
 }

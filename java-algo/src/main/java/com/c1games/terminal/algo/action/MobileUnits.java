@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.Deque;
 
-public class MobileUnits extends GameUnit {
+public class MobileUnits implements GameUnit {
 
     public final UnitType type;
     // back half contains dead units, front contains undamaged units
@@ -24,14 +24,18 @@ public class MobileUnits extends GameUnit {
 
     public MobileUnits(UnitType type, int quantity, double startHealth, Coords coords, int targetEdge) {
         this.type = type;
-        this.healths = new ArrayList<Double>();
+        this.healths = new ArrayList<>();
         for (int i = 0; i < quantity; i++) {
             healths.add(startHealth);
         }
         this.coords = coords;
         this.targetEdge = targetEdge;
-        this.shieldsFrom = new TreeSet<Coords>();
-        this.lastDirection = Pathfinder.Direction.Horizontal;
+        this.shieldsFrom = new TreeSet<>();
+        this.lastDirection = Pathfinder.Direction.HORIZONTAL;
+    }
+
+    public Coords getCoords() {
+        return coords;
     }
 
     public double getTargetHealth() {

@@ -15,12 +15,7 @@ public class Coords implements Comparable<Coords> {
     }
 
     public List<Coords> neighbors() {
-        return List.of(
-                new Coords(x + 1, y),
-                new Coords(x - 1, y),
-                new Coords(x, y + 1),
-                new Coords(x, y - 1)
-        );
+        return List.of(new Coords(x + 1, y), new Coords(x - 1, y), new Coords(x, y + 1), new Coords(x, y - 1));
     }
 
     @Override
@@ -32,14 +27,11 @@ public class Coords implements Comparable<Coords> {
         return (x == other.x) && (y == other.y);
     }
 
-    public static boolean equals(Coords c1, Coords c2) {
-        return (c1.x == c2.x) && (c1.y == c2.y);
-    }
-
     public float distance(Coords other) {
-        return (float)Math.sqrt(((x - other.x) * (x - other.x)) + ((y - other.y) * (y - other.y)));
+        return (float) Math.sqrt(((x - other.x) * (x - other.x)) + ((y - other.y) * (y - other.y)));
     }
 
+    @Override
     public int compareTo(Coords other) {
         return (x == other.x) ? (y - other.y) : (x - other.x);
     }
